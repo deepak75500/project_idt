@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Summary Chatbot</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap');
+
+        body {
+    font-family: 'Poppins', sans-serif;
+    margin: 0;
+    padding: 0;
+    background-image: url('static/stillman.jpeg'); /* Default background */
+    
+    background-position: center;
+    background-attachment: fixed;
+    background-size: 2200px 1000px;
+    height: 100vh; /* Ensure the background covers the full height of the viewport */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+}
+
+
+        .container {
+            width: 1200px;
+            margin: 50px auto;
+            padding: 30px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 2.5rem;
+            color: #f4a300;
+            margin-bottom: 20px;
+        }
+
+        #chatWindow {
+            height: 400px;
+            overflow-y: auto;
+            background: #ffffff;
+            border: 2px solid #f4a300;
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .user-message, .bot-message {
+            margin: 10px 0;
+            padding: 10px 15px;
+            border-radius: 25px;
+            max-width: 70%;
+            line-height: 1.5;
+            position: relative;
+            clear: both;
+        }
+
+        .user-message {
+            background-color: #f4a300;
+            color: #fff;
+            float: right;
+        }
+
+        .bot-message {
+            background-color: #333;
+            color: #fff;
+            float: left;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .bot-message img {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+
+        .clearfix {
+            clear: both;
+        }
+
+        .input-container {
+            display: flex;
+            gap: 10px;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        textarea {
+            flex: 1;
+            padding: 15px;
+            font-size: 1rem;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            resize: none;
+            height: 80px;
+            transition: border-color 0.3s;
+        }
+
+        textarea:focus {
+            border-color: #f4a300;
+            outline: none;
+        }
+
+        button {
+            background-color: #f4a300;
+            color: #fff;
+            border: none;
+            padding: 12px 20px;
+            cursor: pointer;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: background-color 0.3s, transform 0.2s;
+            height: 50px;
+        }
+
+        button:hover {
+            background-color: #cc8400;
+            transform: scale(1.05);
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>LearnAble Chatbot</h1>
+        <div id="chatWindow"></div>
+        <div class="input-container">
+            <textarea id="messageInput" placeholder="Type Your Question or Doubts..."></textarea>
+            <button id="audioBtn">🎙️ Speak</button>
+            <button id="sendMessageBtn">Send</button>
+        </div>
+    </div>
+
+    <script>
+        // Speech-to-Text Functionality
+        document.getElementById("audioBtn").addEventListener("click", function () {
+            if (!navigator.mediaDevices || !window.MediaRecorder) {
+                alert("Your browser does not support audio recording. Please use a modern browser like Chrome.");
+                return;
+            }
+
+            const constraints = { audio: true };
+            let mediaRecorder;
+            let audioChunks = [];
+
+            navigator.mediaDevices.getUserMedia(constraints)
+                .then(function (stream) {
+                    mediaRecorder = new MediaRecorder(stream);
+
+                    mediaRecorder.ondataavailable = function (event) {
+                        audioChunks.push(event.data);
+                    };
+
+                    mediaRecorder.onstop = function () {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
+                        const formData = new FormData();
+                        formData.append('audio', audioBlob, 'audio.mp3');
+
+                        fetch('/upload-audio1', {
+                            method: 'POST',
+                            body: formData
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            console.log("Transcription:", data.transcription);
+                            document.getElementById("messageInput").value += data.transcription + " ";
+                        })
+                        .catch(error => {
+                            console.error('Error uploading audio:', error);
+                        });
+                    };
+
+                    mediaRecorder.start();
+                    console.log("Recording started");
+
+                    setTimeout(() => {
+                        mediaRecorder.stop();
+                        console.log("Recording stopped");
+                        stream.getTracks().forEach(track => track.stop());
+                    }, 5000);
+                })
+                .catch(function (error) {
+                    console.error('Error getting media:', error);
+                });
+        });
+
+        // Send Message
+        document.getElementById('sendMessageBtn').addEventListener('click', function () {
+            const userInput = document.getElementById('messageInput').value.trim();
+            if (!userInput) return;
+
+            const chatWindow = document.getElementById('chatWindow');
+
+            const userMessage = document.createElement('div');
+            userMessage.className = 'user-message';
+            userMessage.textContent = userInput;
+            chatWindow.appendChild(userMessage);
+            chatWindow.appendChild(document.createElement('div')).className = 'clearfix';
+
+            document.getElementById('messageInput').value = '';
+
+            fetch('/summary_chatbot', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: userInput })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    const botMessage = document.createElement('div');
+                    botMessage.className = 'bot-message';
+
+                    // Speaking image
+                    const gif = document.createElement('img');
+                    gif.src = 'static/speaking_man.gif';
+                    gif.alt = 'Bot Speaking';
+
+                    // Text content
+                    const text = document.createElement('span');
+                    text.textContent = data.summary || "Sorry, I couldn't process your request.";
+
+                    botMessage.appendChild(gif);
+                    botMessage.appendChild(text);
+
+                    chatWindow.appendChild(botMessage);
+                    chatWindow.appendChild(document.createElement('div')).className = 'clearfix';
+
+                    chatWindow.scrollTop = chatWindow.scrollHeight;
+
+                    // Speak & switch to still image after speaking
+                    readTextAloud(text.textContent, gif);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+        });
+
+        // Speech synthesis with image change
+        // Speech synthesis with image change and background
+function readTextAloud(text, gifElement) {
+    const utterance = new SpeechSynthesisUtterance(text);
+
+    // When the bot starts speaking, change the full-page background to the GIF
+    utterance.onstart = () => {
+        document.body.style.backgroundImage = "url('static/speaking_man.gif')";
+    };
+
+    // When the bot finishes speaking, change the full-page background back to the still image
+    utterance.onend = () => {
+        if (gifElement) {
+            gifElement.src = 'static/stillman.jpeg'; // switch to neutral still image
+        }
+        document.body.style.backgroundImage = "url('static/stillman.jpeg')";
+    };
+
+    // Speak the text
+    window.speechSynthesis.speak(utterance);
+}
+
+    </script>
+</body>
+</html>

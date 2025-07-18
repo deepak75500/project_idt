@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Auto-Stop on Silence</title>
+</head>
+<body>
+
+<button id="startBtn">Start Recording</button>
+<audio id="audioPlayback" controls></audio>
+
+<script>
+let mediaRecorder;
+let audioChunks = [];
+let silenceTimer;
+let audioContext, analyser, microphone, javascriptNode;
+
+document.getElementById("startBtn").addEventListener("click", async () => {
+    if (!navigator.mediaDevices || !window.MediaRecorder) {
+        alert("Your browser does not support audio recording.");
+        return;
+    }
+
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioContext.createAnalyser();
+    microphone = audioContext.createMediaStreamSource(stream);
+    javascriptNode = audioContext.createScriptProcessor(2048, 1, 1);
+
+    microphone.connect(analyser);
+    analyser.connect(javascriptNode);
+    javascriptNode.connect(audioContext.destination);
+
+    mediaRecorder = new MediaRecorder(stream);
+
+    mediaRecorder.ondataavailable = event => {
+        audioChunks.push(event.data);
+    };
+
+    mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+        const audioUrl = URL.createObjectURL(audioBlob);
+        document.getElementById("audioPlayback").src = audioUrl;
+        audioChunks = []; // Clear chunks
+        stream.getTracks().forEach(track => track.stop());
+        javascriptNode.disconnect();
+        analyser.disconnect();
+        microphone.disconnect();
+        audioContext.close();
+    };
+
+    mediaRecorder.start();
+    console.log("Recording started");
+
+    javascriptNode.onaudioprocess = () => {
+        const array = new Uint8Array(analyser.frequencyBinCount);
+        analyser.getByteFrequencyData(array);
+        const volume = array.reduce((a, b) => a + b, 0) / array.length;
+
+        // console.log("Volume:", volume); // you can see the live volume if you want
+
+        if (volume < 5) { // volume threshold for silence
+            if (!silenceTimer) {
+                silenceTimer = setTimeout(() => {
+                    if (mediaRecorder && mediaRecorder.state === "recording") {
+                        mediaRecorder.stop();
+                        console.log("Stopped due to silence");
+                    }
+                }, 5000); // 5 seconds of silence
+            }
+        } else {
+            if (silenceTimer) {
+                clearTimeout(silenceTimer);
+                silenceTimer = null;
+            }
+        }
+    };
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Automatic Speech Recognition</title>
+</head>
+<body>
+    <h1>Automatic Speech-to-Text using Web Speech API</h1>
+    
+    <h2>Recognized Text:</h2>
+    <p id="output">Listening for speech...</p>
+
+    <script>
+        // Check if the browser supports Web Speech API
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+        if (!SpeechRecognition) {
+            alert("Your browser does not support the Web Speech API.");
+        } else {
+            const recognition = new SpeechRecognition();
+            recognition.continuous = true;  // Keep listening continuously
+            recognition.interimResults = true; // Show partial results
+
+            // Start the speech recognition automatically when the page loads
+            window.onload = () => {
+                recognition.start();
+                document.getElementById("output").textContent = "Listening...";
+            };
+
+            // Process results when speech is recognized
+            recognition.onresult = function(event) {
+                let transcript = "";
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    transcript += event.results[i][0].transcript;
+                }
+                document.getElementById("output").textContent = transcript;
+            };
+
+            // Handle speech recognition errors
+            recognition.onerror = function(event) {
+                console.error("Error occurred: " + event.error);
+                document.getElementById("output").textContent = "Error occurred: " + event.error;
+            };
+        }
+    </script>
+</body>
+</html>

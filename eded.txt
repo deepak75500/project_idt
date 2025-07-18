@@ -1,0 +1,13 @@
+from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
+
+# Get the default audio device
+devices = AudioUtilities.GetSpeakers()
+interface = devices.Activate(
+    IAudioEndpointVolume._iid_, 1, None)
+
+volume = interface.QueryInterface(IAudioEndpointVolume)
+
+# Mute the system volume
+volume.SetMute(1, None)
+
+print("System volume is muted.")
